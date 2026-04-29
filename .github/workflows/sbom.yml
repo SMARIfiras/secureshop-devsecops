@@ -1,0 +1,75 @@
+name: "SBOM Generation"
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  security-events: write
+
+jobs:
+  sbom:
+    name: "Generate SBOM — ${{ matrix.service.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: user-service
+            context: services/user-service
+            image: secureshop/user-service
+          - name: product-service
+            context: services/product-service
+            image: secureshop/product-service
+          - name: order-service
+            context: services/order-service
+            image: secureshop/order-service
+          - name: payment-service
+            context: services/payment-service
+            image: secureshop/payment-service
+          - name: notification-service
+            context: services/notification-service
+            image: secureshop/notification-service
+          - name: inventory-service
+            context: services/inventory-service
+            image: secureshop/inventory-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ matrix.service.image }}:${{ github.sha }} \
+            ${{ matrix.service.context }}
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM (CycloneDX JSON)
+        run: |
+          syft \
+            ${{ matrix.service.image }}:${{ github.sha }} \
+            -o cyclonedx-json \
+            --file sbom-${{ matrix.service.name }}-cyclonedx.json
+
+      - name: Generate SBOM (SPDX JSON)
+        run: |
+          syft \
+            ${{ matrix.service.image }}:${{ github.sha }} \
+            -o spdx-json \
+            --file sbom-${{ matrix.service.name }}-spdx.json
+
+      - name: Upload SBOMs as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.service.name }}
+          path: |
+            sbom-${{ matrix.service.name }}-cyclonedx.json
+            sbom-${{ matrix.service.name }}-spdx.json
+          retention-days: 90

@@ -1,0 +1,28 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# .semgrepignore — paths excluded from Semgrep SAST scans
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Dependencies (never scan third-party code)
+node_modules/
+**/node_modules/
+
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Generated reports
+reports/
+*.sarif
+
+# Test fixtures
+tests/
+test_*/
+*_test.py
+*.test.js
+*.spec.js

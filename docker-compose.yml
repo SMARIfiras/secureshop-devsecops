@@ -1,0 +1,215 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# SecureShop — docker-compose.yml
+# Brings up: API Gateway + 6 microservices + RabbitMQ
+# Used for: local development AND DAST CI testing
+# ──────────────────────────────────────────────────────────────────────────────
+version: "3.9"
+
+# ── Shared defaults ───────────────────────────────────────────────────────────
+x-python-service: &python-defaults
+  restart: unless-stopped
+  networks:
+    - secureshop-net
+  environment:
+    JWT_SECRET: ${JWT_SECRET:-dev-secret-CHANGE-IN-PRODUCTION}
+    DATABASE_URL: /data/app.db
+  volumes:
+    - type: tmpfs
+      target: /data
+  security_opt:
+    - no-new-privileges:true
+  read_only: false
+  mem_limit: 256m
+  cpus: "0.5"
+
+x-node-service: &node-defaults
+  restart: unless-stopped
+  networks:
+    - secureshop-net
+  environment:
+    JWT_SECRET: ${JWT_SECRET:-dev-secret-CHANGE-IN-PRODUCTION}
+    DATABASE_DIR: /data
+    NODE_ENV: production
+  volumes:
+    - type: tmpfs
+      target: /data
+  security_opt:
+    - no-new-privileges:true
+  read_only: false
+  mem_limit: 256m
+  cpus: "0.5"
+
+# ── Services ──────────────────────────────────────────────────────────────────
+services:
+
+  # ── API Gateway ─────────────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: secureshop-gateway
+    ports:
+      - "8080:80"
+    networks:
+      - secureshop-net
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    mem_limit: 128m
+
+  # ── RabbitMQ ────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: secureshop-rabbitmq
+    networks:
+      - secureshop-net
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    ports:
+      - "15672:15672"   # Management UI (dev only)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    mem_limit: 256m
+
+  # ── User Service (Python/FastAPI) ────────────────────────────────────────────
+  user-service:
+    <<: *python-defaults
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: secureshop-user
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-CHANGE-IN-PRODUCTION}
+      DATABASE_URL: /data/users.db
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    expose:
+      - "8001"
+
+  # ── Product Service (Node.js/Express) ────────────────────────────────────────
+  product-service:
+    <<: *node-defaults
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    container_name: secureshop-product
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8002/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    expose:
+      - "8002"
+
+  # ── Order Service (Python/FastAPI) ────────────────────────────────────────────
+  order-service:
+    <<: *python-defaults
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: secureshop-order
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-CHANGE-IN-PRODUCTION}
+      DATABASE_URL: /data/orders.db
+      INVENTORY_SERVICE_URL: http://inventory-service:8006
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    expose:
+      - "8003"
+
+  # ── Payment Service (Node.js/Express) ────────────────────────────────────────
+  payment-service:
+    <<: *node-defaults
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: secureshop-payment
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8004/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    expose:
+      - "8004"
+
+  # ── Notification Service (Python/FastAPI + RabbitMQ) ─────────────────────────
+  notification-service:
+    <<: *python-defaults
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: secureshop-notification
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-CHANGE-IN-PRODUCTION}
+      DATABASE_URL: /data/notifications.db
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    expose:
+      - "8005"
+
+  # ── Inventory Service (Node.js/Express) ──────────────────────────────────────
+  inventory-service:
+    <<: *node-defaults
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+    container_name: secureshop-inventory
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8006/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    expose:
+      - "8006"
+
+# ── Network ───────────────────────────────────────────────────────────────────
+networks:
+  secureshop-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

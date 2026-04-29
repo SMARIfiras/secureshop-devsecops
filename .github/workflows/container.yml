@@ -1,0 +1,99 @@
+name: "Container Image Scanning"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── Build & scan all service images ─────────────────────────────────────────
+  container-scan:
+    name: "Scan ${{ matrix.service.name }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - name: user-service
+            context: services/user-service
+            image: secureshop/user-service
+          - name: product-service
+            context: services/product-service
+            image: secureshop/product-service
+          - name: order-service
+            context: services/order-service
+            image: secureshop/order-service
+          - name: payment-service
+            context: services/payment-service
+            image: secureshop/payment-service
+          - name: notification-service
+            context: services/notification-service
+            image: secureshop/notification-service
+          - name: inventory-service
+            context: services/inventory-service
+            image: secureshop/inventory-service
+          - name: gateway
+            context: gateway
+            image: secureshop/gateway
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ matrix.service.image }}:${{ github.sha }} \
+            ${{ matrix.service.context }}
+
+      # ── Trivy image scan ─────────────────────────────────────────────────
+      - name: Trivy — scan image (SARIF)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ matrix.service.image }}:${{ github.sha }}"
+          format: "sarif"
+          output: "trivy-${{ matrix.service.name }}.sarif"
+          severity: "HIGH,CRITICAL"
+          exit-code: "0"
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-${{ matrix.service.name }}.sarif"
+          category: "trivy-${{ matrix.service.name }}"
+
+      # ── Grype image scan (second opinion) ────────────────────────────────
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Grype — scan image
+        run: |
+          grype \
+            ${{ matrix.service.image }}:${{ github.sha }} \
+            --output sarif \
+            --file grype-${{ matrix.service.name }}.sarif \
+            --fail-on high \
+            || true
+
+      - name: Upload Grype SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "grype-${{ matrix.service.name }}.sarif"
+          category: "grype-${{ matrix.service.name }}"
+
+      # ── Fail pipeline on CRITICAL (Trivy) ────────────────────────────────
+      - name: Trivy — fail on CRITICAL
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ matrix.service.image }}:${{ github.sha }}"
+          severity: "CRITICAL"
+          exit-code: "1"
+          format: "table"
+          ignore-unfixed: true

@@ -1,0 +1,16 @@
+# Normalize line endings: checkout Windows CRLF, commit LF
+* text=auto eol=lf
+
+# Force LF for these file types (Docker/bash scripts must be LF)
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.conf text eol=lf
+*.toml text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.tsv text eol=lf

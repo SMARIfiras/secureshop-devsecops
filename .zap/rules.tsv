@@ -1,0 +1,33 @@
+# ZAP Baseline scan rules for SecureShop
+# Format: <rule-id>\t<IGNORE|WARN|FAIL>\t<description>
+# Reference: https://www.zaproxy.org/docs/alerts/
+
+# ── INFO / False Positives for this architecture ─────────────────────────────
+10015	IGNORE	Incomplete or No Cache-control Header Set
+10016	IGNORE	Web Browser XSS Protection Not Enabled
+10017	IGNORE	Cross-Domain JavaScript Source File Inclusion
+10020	IGNORE	X-Frame-Options Header Not Set
+10021	IGNORE	X-Content-Type-Options Header Missing
+
+# ── WARN — Review but don't fail ─────────────────────────────────────────────
+10010	WARN	Cookie No HttpOnly Flag
+10011	WARN	Cookie Without Secure Flag
+10024	WARN	Information Disclosure - Sensitive Information in URL
+10025	WARN	Information Disclosure - Sensitive Information in HTTP Referrer Header
+10040	WARN	Secure Pages Include Mixed Content
+10054	WARN	Cookie with SameSite Attribute None
+10055	WARN	CSP Scanner
+10063	WARN	Permissions Policy Header Not Set
+
+# ── FAIL — Critical findings that must not exist ──────────────────────────────
+40012	FAIL	Cross Site Scripting (Reflected)
+40014	FAIL	Cross Site Scripting (Persistent)
+40016	FAIL	Cross Site Scripting (Persistent) - Prime
+40017	FAIL	Cross Site Scripting (Persistent) - Spider
+40018	FAIL	SQL Injection
+40019	FAIL	SQL Injection - MySQL
+40020	FAIL	SQL Injection - Hypersonic SQL
+40021	FAIL	SQL Injection - Oracle
+40022	FAIL	SQL Injection - PostgreSQL
+90019	FAIL	Server Side Code Injection
+90020	FAIL	Remote OS Command Injection

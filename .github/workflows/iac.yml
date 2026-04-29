@@ -1,0 +1,64 @@
+name: "IaC Scanning — Dockerfile & Compose Linting"
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # ── Hadolint — Dockerfile linter ────────────────────────────────────────────
+  hadolint:
+    name: "Hadolint — Dockerfile Best Practices"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint on all Dockerfiles
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          format: sarif
+          output-file: hadolint-results.sarif
+          failure-threshold: warning
+          ignore: "DL3008,DL3018"   # pinned apt/apk packages (workshop context)
+
+      - name: Upload Hadolint SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: hadolint-results.sarif
+          category: hadolint
+
+  # ── Checkov — IaC security scanning ─────────────────────────────────────────
+  checkov:
+    name: "Checkov — Docker Compose & Dockerfile Security"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: dockerfile,docker_compose
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          # Skip checks that are expected to fail in a workshop (local dev)
+          skip_check: >-
+            CKV_DOCKER_2,
+            CKV2_DOCKER_1
+          soft_fail: true   # Don't fail pipeline; report only
+
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov

@@ -1,0 +1,112 @@
+name: "DAST — Dynamic Application Security Testing"
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:   # Allow manual trigger
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dast:
+    name: "OWASP ZAP Baseline Scan"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create .env file for CI
+        run: |
+          cat > .env <<EOF
+          JWT_SECRET=ci-dast-secret-$(openssl rand -hex 16)
+          RABBITMQ_USER=guest
+          RABBITMQ_PASS=guest
+          EOF
+
+      - name: Start all services with Docker Compose
+        run: |
+          docker compose up -d --build
+          echo "Waiting for services to be healthy..."
+          
+      - name: Wait for gateway to be ready
+        run: |
+          max_attempts=30
+          attempt=0
+          until curl -sf http://localhost:8080/health > /dev/null; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "Gateway did not become ready in time"
+              docker compose logs
+              exit 1
+            fi
+            echo "Attempt $attempt/$max_attempts — waiting 5s..."
+            sleep 5
+          done
+          echo "Gateway is ready!"
+
+      - name: Create ZAP auth token
+        id: auth
+        run: |
+          # Register a test user
+          curl -sf -X POST http://localhost:8080/api/users/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!","full_name":"ZAP Tester"}' || true
+
+          # Login to get JWT
+          TOKEN=$(curl -sf -X POST http://localhost:8080/api/users/login \
+            -H "Content-Type: application/json" \
+            -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!"}' \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+          echo "zap_token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "Token obtained: ${TOKEN:0:20}..."
+
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: "http://localhost:8080"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: >-
+            -a
+            -j
+            -T 5
+            -H "Authorization:Bearer ${{ steps.auth.outputs.zap_token }}"
+          fail_action: false
+          allow_issue_writing: false
+
+      - name: Run ZAP API Scan on key endpoints
+        uses: zaproxy/action-api-scan@v0.7.0
+        continue-on-error: true
+        with:
+          target: "http://localhost:8080/api/users/docs"
+          format: openapi
+          fail_action: false
+
+      - name: Upload ZAP HTML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report
+          path: |
+            report_html.html
+            report_json.json
+            report_md.md
+          retention-days: 30
+
+      - name: Upload ZAP SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: report_sarif.sarif
+          category: owasp-zap
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+
+      - name: Tear down services
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,97 @@
+name: "SAST — Static Application Security Testing"
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  security-events: write   # Required to upload SARIF to GitHub Security tab
+
+jobs:
+  # ── Bandit: Python SAST ─────────────────────────────────────────────────────
+  bandit:
+    name: "Bandit (Python)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Bandit
+        run: pip install bandit[toml]==1.7.9 bandit-sarif-formatter==1.1.1
+
+      - name: Run Bandit on Python services
+        run: |
+          bandit \
+            -r services/user-service/main.py \
+               services/order-service/main.py \
+               services/notification-service/main.py \
+            -c bandit.yaml \
+            --severity-level medium \
+            --confidence-level medium \
+            -f sarif \
+            -o bandit-results.sarif || true
+        # `|| true` — let the next step upload results even on findings
+
+      - name: Upload Bandit SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: bandit-results.sarif
+          category: bandit-python
+
+      - name: Fail on HIGH severity findings
+        run: |
+          bandit \
+            -r services/user-service/main.py \
+               services/order-service/main.py \
+               services/notification-service/main.py \
+            -c bandit.yaml \
+            --severity-level high \
+            --confidence-level high \
+            -f txt
+
+  # ── Semgrep: Node.js / multi-language SAST ──────────────────────────────────
+  semgrep:
+    name: "Semgrep (Node.js + Multi-language)"
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep — Node.js rules
+        run: |
+          semgrep \
+            --config "p/nodejs" \
+            --config "p/owasp-top-ten" \
+            --config "p/secrets" \
+            --sarif \
+            --output semgrep-results.sarif \
+            services/product-service/ \
+            services/payment-service/ \
+            services/inventory-service/ \
+            || true
+
+      - name: Upload Semgrep SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-results.sarif
+          category: semgrep-nodejs
+
+      - name: Fail on ERROR severity
+        run: |
+          semgrep \
+            --config "p/nodejs" \
+            --config "p/owasp-top-ten" \
+            --error \
+            services/product-service/ \
+            services/payment-service/ \
+            services/inventory-service/

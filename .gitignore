@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+*.env
+.env.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.pnp.*
+.yarn/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Security scan reports (generated artifacts — do not commit)
+reports/
+*.sarif
+dependency-check-report.*
+zap-report.*
+sbom-*.json
+
+# Secrets — never commit these
+*.pem
+*.key
+*.crt
+secrets.txt
+.env.production
+vault-token

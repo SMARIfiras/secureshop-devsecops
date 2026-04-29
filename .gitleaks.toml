@@ -1,0 +1,46 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Gitleaks configuration
+# Scans git history and staged changes for secrets
+# https://github.com/gitleaks/gitleaks
+# ──────────────────────────────────────────────────────────────────────────────
+
+[extend]
+# Extend the default ruleset
+useDefault = true
+
+# ── Allowlist ─────────────────────────────────────────────────────────────────
+# Patterns that are explicitly safe (test fixtures, documentation examples)
+[[allowlists]]
+description = "Ignore known workshop placeholder secrets in docs/tests"
+regexes = [
+  '''dev-secret-change-me''',
+  '''dev-secret-CHANGE-IN-PRODUCTION''',
+  '''Admin1234!''',
+  '''changeme''',
+]
+paths = [
+  '''services/.*/main\.py''',
+  '''services/.*/index\.js''',
+  '''docker-compose\.yml''',
+  '''docs/.*''',
+  '''README\.md''',
+]
+
+[[allowlists]]
+description = "Ignore nosec-annotated lines"
+regexes = ['''.*#\s*nosec.*''']
+
+# ── Custom rules ──────────────────────────────────────────────────────────────
+[[rules]]
+id          = "jwt-secret-env"
+description = "Hard-coded JWT secret not from environment"
+regex       = '''JWT_SECRET\s*=\s*["'][^$][^"']{8,}["']'''
+severity    = "ERROR"
+tags        = ["secret", "jwt"]
+
+[[rules]]
+id          = "rabbitmq-password"
+description = "Hard-coded RabbitMQ password"
+regex       = '''amqp://\w+:[^@$]{4,}@'''
+severity    = "WARNING"
+tags        = ["secret", "rabbitmq"]
