@@ -3,25 +3,20 @@
 # https://bandit.readthedocs.io/en/latest/config.html
 # ──────────────────────────────────────────────────────────────────────────────
 
-[bandit]
 # Directories to skip
-exclude_dirs = [
-  ".git",
-  "venv",
-  "env",
-  ".venv",
-  "__pycache__",
-  "*.egg-info",
-  "tests",
-  "test_",
-]
-
-# Severity / confidence thresholds for CI failure
-# Options: LOW, MEDIUM, HIGH
-severity = MEDIUM
-confidence = MEDIUM
+exclude_dirs:
+  - ".git"
+  - "venv"
+  - "env"
+  - ".venv"
+  - "__pycache__"
+  - "*.egg-info"
+  - "tests"
+  - "test_"
 
 # Tests to skip (with rationale):
 #   B101 — assert statements: acceptable in non-production validation code
 #   B311 — random module: used only for non-security UUIDs (uuid4 is used instead)
-skips = ["B101", "B311"]
+skips:
+  - "B101"
+  - "B311"
