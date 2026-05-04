@@ -61,13 +61,9 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!"}' || echo '{}')
 
-          TOKEN=$(echo "$LOGIN_RESP" | python3 -c "
-import sys, json
-try:
-    print(json.loads(sys.stdin.read()).get('access_token', ''))
-except Exception:
-    print('')
-" 2>/dev/null || echo '')
+          TOKEN=$(echo "$LOGIN_RESP" | python3 -c "import sys, json;
+          try: print(json.loads(sys.stdin.read()).get('access_token', ''))
+          except Exception: print('')" 2>/dev/null || echo '')
 
           if [ -n "$TOKEN" ]; then
             echo "zap_token=$TOKEN" >> "$GITHUB_OUTPUT"
