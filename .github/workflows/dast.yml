@@ -1,4 +1,4 @@
-name: "DAST — Dynamic Application Security Testing"
+name: "DAST"
 
 on:
   push:
