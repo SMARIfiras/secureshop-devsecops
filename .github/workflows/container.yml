@@ -95,5 +95,5 @@ jobs:
           image-ref: "${{ matrix.service.image }}:${{ github.sha }}"
           severity: "CRITICAL"
           exit-code: "1"
-          format: "table"
           ignore-unfixed: true
+          format: "table"

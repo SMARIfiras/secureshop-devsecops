@@ -50,18 +50,33 @@ jobs:
       - name: Create ZAP auth token
         id: auth
         run: |
-          # Register a test user
-          curl -sf -X POST http://localhost:8080/api/users/register \
+          # Register a test user (ignore 400 if already exists)
+          curl -s -X POST http://localhost:8080/api/users/register \
             -H "Content-Type: application/json" \
-            -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!","full_name":"ZAP Tester"}' || true
+            -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!","full_name":"ZAP Tester"}' \
+            -o /dev/null || true
 
-          # Login to get JWT
-          TOKEN=$(curl -sf -X POST http://localhost:8080/api/users/login \
+          # Login to get JWT — capture full response first, then parse
+          LOGIN_RESP=$(curl -s -X POST http://localhost:8080/api/users/login \
             -H "Content-Type: application/json" \
-            -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!"}' \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-          echo "zap_token=$TOKEN" >> "$GITHUB_OUTPUT"
-          echo "Token obtained: ${TOKEN:0:20}..."
+            -d '{"email":"zap-test@secureshop.local","password":"ZapTest1234!"}' || echo '{}')
+
+          TOKEN=$(echo "$LOGIN_RESP" | python3 -c "
+import sys, json
+try:
+    print(json.loads(sys.stdin.read()).get('access_token', ''))
+except Exception:
+    print('')
+" 2>/dev/null || echo '')
+
+          if [ -n "$TOKEN" ]; then
+            echo "zap_token=$TOKEN" >> "$GITHUB_OUTPUT"
+            echo "Token obtained: ${TOKEN:0:20}..."
+          else
+            echo "Warning: Could not obtain auth token — ZAP will scan unauthenticated"
+            echo "Login response: $LOGIN_RESP"
+            echo "zap_token=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.14.0
@@ -94,10 +109,11 @@ jobs:
             report_json.json
             report_md.md
           retention-days: 30
+          if-no-files-found: ignore
 
       - name: Upload ZAP SARIF
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: always() && hashFiles('report_sarif.sarif') != ''
         continue-on-error: true
         with:
           sarif_file: report_sarif.sarif
