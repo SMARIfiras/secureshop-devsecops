@@ -36,7 +36,7 @@ jobs:
         continue-on-error: true   # Upload report even if findings exist
 
       - name: Upload Dependency-Check SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: reports/dependency-check/dependency-check-report.sarif
           category: owasp-dependency-check
@@ -67,7 +67,7 @@ jobs:
           exit-code: "0"   # Don't fail here; let SARIF upload first
 
       - name: Upload Trivy FS SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-fs-results.sarif
           category: trivy-filesystem

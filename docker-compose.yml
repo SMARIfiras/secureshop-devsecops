@@ -8,9 +8,8 @@ x-python-service: &python-defaults
   environment:
     JWT_SECRET: ${JWT_SECRET:-dev-secret-CHANGE-IN-PRODUCTION}
     DATABASE_URL: /data/app.db
-  volumes:
-    - type: tmpfs
-      target: /data
+  # No volume mount — Python services write SQLite to /data inside the image
+  # (Dockerfile: RUN mkdir -p /data && chown appuser:appuser /data)
   security_opt:
     - no-new-privileges:true
   mem_limit: 256m

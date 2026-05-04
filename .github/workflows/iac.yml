@@ -29,7 +29,7 @@ jobs:
           ignore: "DL3008,DL3018"   # pinned apt/apk packages (workshop context)
 
       - name: Upload Hadolint SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: hadolint-results.sarif
@@ -57,7 +57,7 @@ jobs:
           soft_fail: true   # Don't fail pipeline; report only
 
       - name: Upload Checkov SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: checkov-results.sarif

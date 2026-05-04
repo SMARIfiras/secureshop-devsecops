@@ -62,7 +62,7 @@ jobs:
           exit-code: "0"
 
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "trivy-${{ matrix.service.name }}.sarif"
           category: "trivy-${{ matrix.service.name }}"
@@ -83,7 +83,7 @@ jobs:
             || true
 
       - name: Upload Grype SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: "grype-${{ matrix.service.name }}.sarif"
           category: "grype-${{ matrix.service.name }}"
