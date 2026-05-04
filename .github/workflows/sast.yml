@@ -36,9 +36,10 @@ jobs:
             -c bandit.yaml \
             --severity-level medium \
             --confidence-level medium \
+            --exit-zero \
             -f sarif \
-            -o bandit-results.sarif || true
-        # `|| true` — let the next step upload results even on findings
+            -o bandit-results.sarif
+        # `--exit-zero` — always create the SARIF file so upload-sarif never fails on a missing file
 
       - name: Upload Bandit SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v4

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check Suppression File — SecureShop
+  Reference: https://jeremylong.github.io/DependencyCheck/general/suppression.html
+
+  Add suppressions here for known false-positives or accepted risks.
+  Each suppression should include a rationale comment and an expiry date.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+  <!--
+    Example suppression template (uncomment and adapt as needed):
+
+    <suppress until="2026-12-31Z">
+      <notes>
+        CVE-XXXX-XXXX: False positive — this CVE affects library X version Y,
+        but we use version Z which is not affected. Reference: <link>
+      </notes>
+      <cve>CVE-XXXX-XXXX</cve>
+    </suppress>
+  -->
+
+</suppressions>
