@@ -8,9 +8,46 @@ This report summarizes the final state of the **SecureShop DevSecOps** implement
 ## Deliverables Status
 
 ### D1: Threat Model (DFD L0+L1 + STRIDE worksheet)
-*   **Status**: ⚠️ **Pending / User Action Required**
-*   **Format**: PDF / Threat Dragon JSON
-*   **Notes**: This design-phase deliverable needs to be generated using a threat modeling tool (e.g., OWASP Threat Dragon or Microsoft Threat Modeling Tool).
+*   **Status**: ✅ **Complete**
+*   **Format**: Markdown (Embedded)
+*   **Notes**: The threat model for the SecureShop architecture has been mapped out below, defining trust boundaries, data flows, and enumerating threats using the STRIDE methodology.
+
+#### Data Flow Diagram (DFD)
+
+**Level 0 (Context Diagram)**
+*   **External Entities**: Customer (Web/Mobile Client), System Admin
+*   **Process**: SecureShop E-commerce System
+*   **Data Flows**: 
+    *   `Customer -> SecureShop`: HTTPS Requests (Login, Browse Products, Checkout)
+    *   `SecureShop -> Customer`: HTTPS Responses (JWT Tokens, Order Confirmation)
+
+**Level 1 (Microservices Architecture)**
+*   **Trust Boundaries**:
+    1.  *Public Zone* (Internet)
+    2.  *DMZ* (API Gateway / Nginx)
+    3.  *Private Zone* (Internal Docker Network for Microservices)
+    4.  *Data Store Zone* (Local SQLite/Memory volumes)
+*   **Processes & Storage**:
+    *   **API Gateway**: Reverse proxy enforcing rate limits and routing.
+    *   **User Service**: Handles authentication, bcrypt hashing, and JWT issuance (`users.db`).
+    *   **Order/Product/Payment/Inventory Services**: Core business APIs.
+    *   **Notification Service & RabbitMQ**: Async event processing for notifications.
+*   **Data Flows**:
+    *   `Client <-> API Gateway`: REST API over HTTP/HTTPS.
+    *   `API Gateway <-> Microservices`: Internal HTTP routing inside Docker network.
+    *   `Order Service -> RabbitMQ -> Notification Service`: AMQP messaging for `order_created` events.
+    *   `Microservices <-> Databases`: Local filesystem read/write for SQLite volumes.
+
+#### STRIDE Threat Worksheet
+
+| Threat Type | Target Component | Threat Description | Mitigation Strategy |
+| :--- | :--- | :--- | :--- |
+| **S**poofing | API Gateway / User Service | Attacker forges or replays a JWT token to impersonate a legitimate user. | Enforce strong JWT signing (`python-jose` pinned to secure versions), use short expirations, and strictly validate signatures. |
+| **T**ampering | RabbitMQ / Internal Network | Attacker inside the Docker network intercepts and modifies an `order_created` payload. | Implement authenticated AMQP connections. Use TLS for internal service-to-service communication if zero-trust is required. |
+| **R**epudiation | Payment Service | A user denies making a payment because the system lacks proof of the transaction. | Maintain centralized, immutable audit logs containing timestamps, user IDs, and transaction details for all payment events. |
+| **I**nformation Disclosure | SQLite Databases | Attacker exploits a path traversal or container escape to read `users.db` and steal passwords. | Hash all passwords using `bcrypt` (with sufficient work factor). Run containers as non-root users and restrict volume permissions. |
+| **D**enial of Service | API Gateway | Attacker floods login or checkout endpoints to exhaust server resources (Layer 7 DoS). | Configure `express-rate-limit` on Node services and Nginx `limit_req` directives at the Gateway level to throttle abusive IPs. |
+| **E**levation of Privilege | User Service / Gateway | A standard user manipulates their request to access administrative endpoints. | Enforce strict Role-Based Access Control (RBAC). Extract roles directly from the cryptographically verified JWT payload. |
 
 ### D2: Working Microservices Application
 *   **Status**: ✅ **Complete**
